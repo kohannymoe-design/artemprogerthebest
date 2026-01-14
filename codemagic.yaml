@@ -14,9 +14,10 @@ workflows:
         BUNDLE_ID: "ui.temaproger.talkmoney"
         TEAM_ID: "BM58B3Y24D"
         BUILD_NUM: "${CM_BUILD_NUMBER}"
-        EXPORT_METHOD: "app-store"
+        # ✅ ОБНОВЛЕНО: новое название метода экспорта (убирает warning)
+        EXPORT_METHOD: "app-store-connect"
 
-        # ✅ ДОБАВЛЕНО: маркетинговая версия (должна быть > 1.0, иначе "train 1.0 closed")
+        # ✅ ДОБАВЛЕНО: маркетинговая версия
         APP_VERSION: "1.0.1"
 
     scripts:
@@ -25,7 +26,6 @@ workflows:
           xcodebuild -version
           swift --version || true
 
-      # ✅ ДОБАВЛЕНО: гарантируем непустой BUILD_NUM для CFBundleVersion
       - name: Set BUILD_NUM (Codemagic built-ins fallback)
         script: |
           set -euo pipefail
@@ -75,20 +75,11 @@ workflows:
           rm -rf "$ARCHIVE_PATH" || true
 
           # СТРАТЕГИЯ: NO SIGNING AT ARCHIVE
-          # Мы собираем архив вообще без подписи.
-          # Подпись будет наложена ТОЛЬКО на этапе exportArchive.
-          
-          # 1. Говорим, что подпись не требуется.
           echo "CODE_SIGNING_REQUIRED = NO" > build.xcconfig
           echo "CODE_SIGNING_ALLOWED = NO" >> build.xcconfig
-          
-          # 2. Убираем любые упоминания идентичности и профилей.
           echo "CODE_SIGN_IDENTITY = " >> build.xcconfig
           echo "EXPANDED_CODE_SIGN_IDENTITY = " >> build.xcconfig
           echo "PROVISIONING_PROFILE_SPECIFIER = " >> build.xcconfig
-          
-          # 3. Важно: Устанавливаем команду разработки, чтобы Xcode не ругался на её отсутствие,
-          # но подписывать не даем.
           echo "DEVELOPMENT_TEAM = $TEAM_ID" >> build.xcconfig
 
           # Запускаем архив
@@ -126,6 +117,17 @@ workflows:
 
       - name: Create exportOptions.plist
         script: |
+          # ✅ ИСПРАВЛЕНИЕ: Находим точное имя сертификата в Keychain
+          # Это решает ошибку "No signing certificate iOS Distribution found"
+          CERT_NAME=$(security find-identity -v -p codesigning | grep "Distribution" | head -1 | cut -d '"' -f 2)
+          
+          if [ -z "$CERT_NAME" ]; then
+            echo "Error: No Distribution certificate found in keychain!"
+            exit 1
+          fi
+          
+          echo "Detected Signing Certificate: $CERT_NAME"
+
           cat > exportOptions.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -137,6 +139,8 @@ workflows:
               <string>$TEAM_ID</string>
               <key>signingStyle</key>
               <string>manual</string>
+              <key>signingCertificate</key>
+              <string>$CERT_NAME</string>
               <key>provisioningProfiles</key>
               <dict>
                   <key>$BUNDLE_ID</key>
@@ -172,8 +176,7 @@ workflows:
       - $CM_BUILD_DIR/*.xcarchive
       - exportOptions.plist
 
-    # ✅ ДОБАВЛЕНО: Загрузка в App Store Connect (TestFlight)
-    # Этот блок выполняется ПОСЛЕ скриптов и использует переменные из группы appstore_connect
+    # ✅ Загрузка в App Store Connect
     publishing:
       app_store_connect:
         api_key: $APP_STORE_CONNECT_PRIVATE_KEY
