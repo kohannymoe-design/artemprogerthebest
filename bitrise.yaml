@@ -1,0 +1,56 @@
+format_version: "11"
+default_step_lib_source: "https://github.com/bitrise-io/bitrise-steplib.git"
+
+app:
+  envs:
+    - PROJECT_PATH: "Project-19-12-25-1.xcodeproj"
+    - SCHEME: "Project-19-12-25-1"
+    - EXPORT_METHOD: "app-store"
+    - BUNDLE_ID: "ui.temaproger.talkmoney"
+    - TEAM_ID: "BM58B3Y24D"
+    # ВАЖНО: Имя переменной должно совпадать с тем, что вы прописали в Xcode ($(BITRISE_PROFILE_ID))
+    - BITRISE_PROFILE_ID: "f3d896ea-4065-4beb-97f7-e8d965d5c509"
+
+workflows:
+  archive_and_export_app:
+    steps:
+      # (опц) проверим, что секреты ASC заданы
+      - script@1:
+          title: "Preflight: check ASC API key secrets"
+          inputs:
+            - content: |-
+                set -e
+                for v in APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_IDENTIFIER APP_STORE_CONNECT_PRIVATE_KEY; do
+                  if [ -z "${!v:-}" ]; then echo "❌ Missing secret: $v"; exit 1; fi
+                done
+                echo "$APP_STORE_CONNECT_PRIVATE_KEY" | grep -q "BEGIN PRIVATE KEY" || { echo "❌ APP_STORE_CONNECT_PRIVATE_KEY must be full .p8 content"; exit 1; }
+                echo "✅ ASC API key secrets OK"
+      
+      - git-clone@8: {}
+
+      - certificate-and-profile-installer@1: {}
+
+      - xcode-archive@5:
+          inputs:
+            - project_path: "$PROJECT_PATH"
+            - scheme: "$SCHEME"
+            - configuration: "Release"
+            - distribution_method: "$EXPORT_METHOD"
+            - automatic_code_signing: "off"
+            - compile_bitcode: "false"
+            - upload_bitcode: "false"
+            # ИСПРАВЛЕНО: Убраны глобальные настройки подписи, чтобы не ломать Firebase
+            - xcodebuild_options: "-destination 'generic/platform=iOS'"
+            - log_formatter: "xcpretty"
+
+      # ⬇️ Загрузка IPA в TestFlight
+      - app-store-connect-upload@1:
+          inputs:
+            - issuer_id: "$APP_STORE_CONNECT_ISSUER_ID"
+            - key_id: "$APP_STORE_CONNECT_KEY_IDENTIFIER"
+            - private_key: "$APP_STORE_CONNECT_PRIVATE_KEY"
+            - submit_to_testflight: "yes"
+            - skip_wait_for_build_processing: "yes"
+            - verbose_log: "yes"
+
+      - deploy-to-bitrise-io@2: {}
