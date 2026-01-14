@@ -9,10 +9,10 @@ workflows:
         - appstore_connect
         - signing
       vars:
-        XCODE_PROJECT: "Project-19-12-25-1.xcodeproj"
-        XCODE_SCHEME: "Project-19-12-25-1"
-        BUNDLE_ID: "ui.temaproger.talkmoney"
-        TEAM_ID: "BM58B3Y24D"
+        XCODE_PROJECT: "Project-21-12-25-1.xcodeproj"
+        XCODE_SCHEME: "Project-21-12-25-1"
+        BUNDLE_ID: "com.danielian.selfcontrol.dopaminedetox"
+        TEAM_ID: "AZSUVQUSS2"
         BUILD_NUM: "${CM_BUILD_NUMBER}"
         EXPORT_METHOD: "app-store"
 
@@ -166,31 +166,17 @@ workflows:
           ls -lah "$EXPORT_PATH" || true
           test -e "$EXPORT_PATH"/*.ipa
 
-      # ✅ ДОБАВЛЕНО: Загрузка в App Store Connect
-      - name: Publish to App Store Connect
-        script: |
-          set -e
-          
-          # Находим IPA файл
-          IPA_PATH=$(find "$CM_EXPORT_DIR" -name "*.ipa" | head -n 1)
-          
-          if [ -z "$IPA_PATH" ]; then
-            echo "Error: No IPA file found in $CM_EXPORT_DIR"
-            exit 1
-          fi
-          
-          echo "Found IPA at: $IPA_PATH"
-          
-          # Загружаем в App Store Connect
-          # Используем переменные из группы 'appstore_connect'
-          app-store-connect publish \
-            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
-            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
-            --path "$IPA_PATH"
-
     artifacts:
       - $CM_EXPORT_DIR/*.ipa
       - $CM_EXPORT_DIR/*.dSYM.zip
       - $CM_BUILD_DIR/*.xcarchive
       - exportOptions.plist
+
+    # ✅ ДОБАВЛЕНО: Загрузка в App Store Connect (TestFlight)
+    # Этот блок выполняется ПОСЛЕ скриптов и использует переменные из группы appstore_connect
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
