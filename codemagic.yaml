@@ -9,10 +9,10 @@ workflows:
         - appstore_connect
         - signing
       vars:
-        XCODE_PROJECT: "Project-21-12-25-1.xcodeproj"
-        XCODE_SCHEME: "Project-21-12-25-1"
-        BUNDLE_ID: "com.danielian.selfcontrol.dopaminedetox"
-        TEAM_ID: "AZSUVQUSS2"
+        XCODE_PROJECT: "Project-19-12-25-1.xcodeproj"
+        XCODE_SCHEME: "Project-19-12-25-1"
+        BUNDLE_ID: "ui.temaproger.talkmoney"
+        TEAM_ID: "BM58B3Y24D"
         BUILD_NUM: "${CM_BUILD_NUMBER}"
         EXPORT_METHOD: "app-store"
 
